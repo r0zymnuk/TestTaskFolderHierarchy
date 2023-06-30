@@ -14,6 +14,8 @@
     <!-- Breadcrumbs -->
     @if (@pathList.Count() > 0)
     {
+        <a href="/">Root Folder</a>
+            <span class="mx-2">/</span>
         @for (int i = 0; i < pathList.Count; i++)
         {
             string path = "";
@@ -30,27 +32,48 @@
 
     @if (Model.Data is not null)
     {
-        <h1 class="display-4">@Model.Data.Name</h1>
+        <h3 class="display-4">@Model.Data.Name</h3>
         <p>Sub folders</p>
         <ul>
-            @foreach (var subFolder in Model.Data.SubFolders)
-        {
-            string path = "";
-            if (Model.Path is not null)
-                path = Model.Path + "/" + subFolder.Name;
+            @if (Model.Data.SubFolders.Count() > 0)
+            {
+                @foreach (var subFolder in Model.Data.SubFolders)
+                {
+                    string path = "";
+                    if (Model.Path is not null)
+                        path = Model.Path + "/" + subFolder.Name;
+                    else
+                        path = subFolder.Name;
+                    <a href="/@path"><li>@subFolder.Name</li></a>
+                }
+            }
             else
-                path = subFolder.Name;
-            <a href="/@path"><li>@subFolder.Name</li></a>
-        }
+            {
+                <p>Folder is empty</p>
+            }
         </ul>
         <hr>   
         @using (Html.BeginForm("PostFolder", "Folder", FormMethod.Post, new {path = @Context.Request.Path}))
         {
+            <label>Create new folder</label>
+            <br>
             <input name="path" value="@Model.Path" type="hidden"/>
             <label for="name">Name:</label>
-            <input type="text" id="name" name="Name" value="@Model.Data.Name" />
+            <input type="text" id="name" name="Name" value="New Folder" />
 
             <button type="submit">Submit</button>
+        }
+
+        <hr>
+        <!-- Delete Folder -->
+        @if (@Model.Path is not null)
+        {
+            @using (Html.BeginForm("DeleteFolder", "Folder", FormMethod.Post, new {path = @Context.Request.Path}))
+            {
+                <label>Delete folder</label>
+                <input name="path" value="@Model.Path" type="hidden"/>
+                <button type="submit">Delete</button>
+            }
         }
     }
     else
