@@ -1,18 +1,9 @@
-@model TModel
+@model Folder
 
-@{
-    Layout = null;
+@using (Html.BeginForm("PostFolder", "Folder", FormMethod.Post))
+{
+    <label for="name">Name:</label>
+    <input type="text" id="name" name="Name" value="@Model.Name" />
+
+    <button type="submit">Submit</button>
 }
-
-<!DOCTYPE html>
-
-<html>
-<head>
-    <title>title</title>
-</head>
-<body>
-<div>
-      
-</div>
-</body>
-</html>

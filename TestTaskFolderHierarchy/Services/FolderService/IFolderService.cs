@@ -5,10 +5,8 @@ namespace TestTaskFolderHierarchy.Services.FolderService;
 
 public interface IFolderService
 {
-    List<Folder> GetFolders();
-    List<Folder> GetFolderById(Guid id);
-    List<Folder> GetFolderByName(string name);
-    List<Folder> CreateFolder(Folder folder);
+    ServiceResponse<FolderViewModel> GetFolderByPath(string path);
+    ServiceResponse<FolderViewModel> CreateFolder(string name, string path);
     // List<Folder> UpdateFolder(Folder folder);
     // void DeleteFolder(Guid id);
     // List<Folder> UploadFile(Guid id, IFormFile file);

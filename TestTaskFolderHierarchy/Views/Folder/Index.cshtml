@@ -1,11 +1,37 @@
-@model FolderViewModel
+@model ServiceResponse<FolderViewModel>
 
 @{
     ViewData["Title"] = "Folder Page";
 }
 
 <div class="text-center">
-    <h1 class="display-4">Folder title</h1>
-    <p>Sub folders</p>
-    <p>@Model.Name</p>
+    @if (Model.Data is not null)
+    {
+        <h1 class="display-4">@Model.Data.Name</h1>
+        <p>Sub folders</p>
+        <ul>
+            @foreach (var subFolder in Model.Data.SubFolders)
+        {
+            string path = "";
+            if (Model.Path is not null)
+                path = Model.Path + "/" + subFolder.Name;
+            else
+                path = subFolder.Name;
+            <a href="/@path"><li>@subFolder.Name</li></a>
+        }
+        </ul>
+        <hr>   
+        @using (Html.BeginForm("PostFolder", "Folder", FormMethod.Post, new {path = @Context.Request.Path}))
+        {
+            <input name="path" value="@Model.Path" type="hidden"/>
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="Name" value="@Model.Data.Name" />
+
+            <button type="submit">Submit</button>
+        }
+    }
+    else
+    {
+        <h1 class="display-4">Folder not found</h1>
+    }
 </div>

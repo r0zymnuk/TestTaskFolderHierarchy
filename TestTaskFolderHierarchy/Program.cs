@@ -10,6 +10,8 @@ builder.Services.AddDbContext<DataContext>(options =>
 
 builder.Services.AddScoped<IFolderService, FolderService>();
 
+builder.Services.AddAutoMapper(typeof(Program).Assembly);
+
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
