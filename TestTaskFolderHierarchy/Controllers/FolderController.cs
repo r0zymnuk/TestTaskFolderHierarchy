@@ -24,13 +24,6 @@ public class FolderController : Controller
         return View(response);
     }
     
-    // [HttpGet("folder/form")]
-    // public IActionResult AddFolder()
-    // {
-    //     var folder = new Folder();
-    //     return View(folder);
-    // }
-    
     [HttpPost]
     public IActionResult PostFolder(string path, string name)
     {
