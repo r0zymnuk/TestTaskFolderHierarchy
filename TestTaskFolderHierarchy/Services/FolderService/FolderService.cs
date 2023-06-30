@@ -116,4 +116,55 @@ public class FolderService : IFolderService
         return response;
 
     }
+
+    public string DeleteFolder(string path)
+    {
+        var pathList = new List<string>();
+        
+        //Get path to parent folder
+        var parentPath = "";
+        if (path.Contains('/'))
+        {
+            var pathListForParent = path.Split('/').ToList();
+            pathListForParent.RemoveAt(pathListForParent.Count - 1);
+            parentPath = string.Join('/', pathListForParent);
+        }
+        
+
+        if (!string.IsNullOrEmpty(path))
+        { 
+            pathList = path.Split('/').ToList();
+        }
+        var folder = GetToTheLastFolder(pathList);
+        if (folder is null)
+        {
+            return parentPath;
+        }
+        var parentFolder = _context.Folders
+            .Include(f => f.SubFolders)
+            .FirstOrDefault(f => f.Id == folder.ParentId);
+        
+        DeleteFolder(folder.Id);
+        return parentPath;
+    }
+
+    public void DeleteFolder(Guid folderId)
+    {
+        var folder = _context.Folders.Include(f => f.SubFolders).FirstOrDefault(f => f.Id == folderId);
+
+        if (folder != null)
+        {
+            DeleteSubfolders(folder.SubFolders);
+            _context.Folders.Remove(folder);
+            _context.SaveChanges();
+        }
+    }
+
+    private void DeleteSubfolders(ICollection<Folder> subfolders)
+    {
+        foreach (var subfolder in subfolders.ToList())
+        {
+            DeleteFolder(subfolder.Id);
+        }
+    }
 }

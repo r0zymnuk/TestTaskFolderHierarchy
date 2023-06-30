@@ -32,6 +32,13 @@ public class FolderController : Controller
         _folderService.CreateFolder(name, path);
         return Redirect("/" + path + "/"+ name);
     }
+
+    [HttpPost]
+    public IActionResult DeleteFolder(string path)
+    {
+        var parentPath = _folderService.DeleteFolder(path);
+        return Redirect("/" + parentPath);
+    }
     
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
