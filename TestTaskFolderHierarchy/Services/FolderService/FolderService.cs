@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Transactions;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using TestTaskFolderHierarchy.Data;
@@ -23,11 +24,10 @@ public class FolderService : IFolderService
         response.Path = path;
         var folderResponse = GetFolderModelByPath(path);
 
-        if (folderResponse.Data is not null){
-            response.Data = _mapper.Map<FolderViewModel>(folderResponse.Data);
-        }
+        response.Data = _mapper.Map<FolderViewModel>(folderResponse.Data);
         response.Success = folderResponse.Success;
         response.Message = folderResponse.Message;
+
         return response;
     }
 
@@ -36,33 +36,24 @@ public class FolderService : IFolderService
         var response = new ServiceResponse<Folder>();
         response.Path = path;
 
-        if (string.IsNullOrEmpty(path))
-        {
-            response.Data = new Folder{
-                Name = "Root Folder",
-                SubFolders = _context.Folders
-                    .Where(f => f.ParentId == null)
-                    .ToList()
-            };
-            return response;
-        }
-        var pathList = path.Split('/').ToList();
-        var folder = GetToTheLastFolder(pathList);
-        if (folder != null)
-        {
-            response.Data = folder;
-            return response;
-        }
-        else
+        var folder = GetToTheLastFolder(path);
+        response.Data = folder;
+        if (folder is null)
         {
             response.Success = false;
             response.Message = "Folder not found";
-            return response;
         }
+
+        return response;
     }
 
-    private Folder? GetToTheLastFolder(List<string> pathList)
+    private Folder? GetToTheLastFolder(string path)
     {
+        var pathList = new List<string>();
+        if (!string.IsNullOrEmpty(path))
+        {
+            pathList = path.Split('/').ToList();
+        }
         var rootFolders = _context.Folders
             .Where(f => f.ParentId == null)
             .ToList();
@@ -97,24 +88,21 @@ public class FolderService : IFolderService
 
     }
 
-    public ServiceResponse<FolderViewModel> CreateFolder(string name, string path)
+    public string CreateFolder(string name, string path)
     {
         var response = new ServiceResponse<FolderViewModel>();
         response.Path = path;
+        
         var folder = new Folder();
         folder.Name = name;
-        var pathList = new List<string>();
 
-        if (!string.IsNullOrEmpty(path))
-            pathList = path.Split('/').ToList();
-        
-        var parentFolder = GetToTheLastFolder(pathList);
+        var parentFolder = GetToTheLastFolder(path);
+
         if (parentFolder is null)
         {
-            response.Success = false;
-            response.Message = "Folder not found";
-            return response;
+            return path;
         }
+
         if (parentFolder.Name == "Root Folder")
         {
             folder.ParentId = null;
@@ -124,59 +112,57 @@ public class FolderService : IFolderService
             folder.ParentId = parentFolder.Id;
             parentFolder.SubFolders.Add(folder);
         }
-        _context.Folders.Add(folder);
-        _context.SaveChanges();
-        
-        response.Data = _mapper.Map<FolderViewModel>(folder);
-        return response;
 
+        using (var transactionScope = new TransactionScope())
+        {
+            _context.Folders.Add(folder);
+            _context.SaveChanges();
+
+            transactionScope.Complete();
+        }
+        
+        return Path.Combine(path == null ? "" : path, name);
     }
+
 
     public string DeleteFolder(string path)
     {
         var pathList = new List<string>();
         
         //Get path to parent folder
-        var parentPath = "";
-        if (path.Contains('/'))
-        {
-            var pathListForParent = path.Split('/').ToList();
-            pathListForParent.RemoveAt(pathListForParent.Count - 1);
-            parentPath = string.Join('/', pathListForParent);
-        }
-        
+        var parentPath = Path.GetDirectoryName(path) ?? string.Empty;
 
-        if (!string.IsNullOrEmpty(path))
-        { 
-            pathList = path.Split('/').ToList();
-        }
-        var folder = GetToTheLastFolder(pathList);
+        var folder = GetToTheLastFolder(path);
         if (folder is null)
         {
             return parentPath;
         }
 
-        DeleteFolderById(folder.Id);
+        DeleteSubfolders(folder.SubFolders);
+        _context.Folders.Remove(folder);
+        _context.SaveChanges();
+
         return parentPath;
-    }
-
-    public void DeleteFolderById(Guid folderId)
-    {
-        var folder = _context.Folders.Include(f => f.SubFolders).FirstOrDefault(f => f.Id == folderId);
-
-        if (folder != null)
-        {
-            DeleteSubfolders(folder.SubFolders);
-            _context.Folders.Remove(folder);
-            _context.SaveChanges();
-        }
     }
 
     private void DeleteSubfolders(ICollection<Folder> subfolders)
     {
         foreach (var subfolder in subfolders.ToList())
         {
-            DeleteFolderById(subfolder.Id);
+            using (var transactionScope = new TransactionScope())
+            {
+                var subfolderEntity = _context.Folders
+                    .Include(f => f.SubFolders)
+                    .First(f => f.Id == subfolder.Id);
+
+                if (subfolder.SubFolders.Count > 0)
+                    DeleteSubfolders(subfolder.SubFolders);
+                
+                _context.Folders.Remove(subfolderEntity);
+                _context.SaveChanges();
+
+                transactionScope.Complete();
+            }
         }
     }
 

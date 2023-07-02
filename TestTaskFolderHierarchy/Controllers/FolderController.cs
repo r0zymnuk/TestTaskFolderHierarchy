@@ -20,18 +20,14 @@ public class FolderController : Controller
     [HttpGet("{*path}")]
     public IActionResult Index(string path)
     {
-        Console.WriteLine(path);
-        var response = _folderService.GetFolderByPath(path);
-        return View(response);
+        return View(_folderService.GetFolderByPath(path));
     }
     
     [HttpPost]
     public IActionResult PostFolder(string path, string name)
     {
-        Console.WriteLine(path);
-        Console.WriteLine(name);
-        _folderService.CreateFolder(name, path);
-        return Redirect("/" + path + "/"+ name);
+        var newFolderPath = _folderService.CreateFolder(name, path); 
+        return Redirect("/" + newFolderPath);
     }
 
     [HttpPost]

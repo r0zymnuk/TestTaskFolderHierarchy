@@ -7,7 +7,6 @@ public class DataContext : DbContext
 {
     public DataContext(DbContextOptions<DataContext> options) : base(options)
     {
-        
     }
     
     public DbSet<Folder> Folders { get; set; } = null!;
