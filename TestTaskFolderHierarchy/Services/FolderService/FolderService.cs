@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using TestTaskFolderHierarchy.Data;
@@ -20,22 +21,36 @@ public class FolderService : IFolderService
     {
         var response = new ServiceResponse<FolderViewModel>();
         response.Path = path;
+        var folderResponse = GetFolderModelByPath(path);
+
+        if (folderResponse.Data is not null){
+            response.Data = _mapper.Map<FolderViewModel>(folderResponse.Data);
+        }
+        response.Success = folderResponse.Success;
+        response.Message = folderResponse.Message;
+        return response;
+    }
+
+    public ServiceResponse<Folder> GetFolderModelByPath(string path)
+    {
+        var response = new ServiceResponse<Folder>();
+        response.Path = path;
 
         if (string.IsNullOrEmpty(path))
         {
-            response.Data = _mapper.Map<FolderViewModel>(new Folder{
-                Name = "root",
+            response.Data = new Folder{
+                Name = "Root Folder",
                 SubFolders = _context.Folders
                     .Where(f => f.ParentId == null)
                     .ToList()
-            });
+            };
             return response;
         }
         var pathList = path.Split('/').ToList();
         var folder = GetToTheLastFolder(pathList);
         if (folder != null)
         {
-            response.Data = _mapper.Map<FolderViewModel>(folder);
+            response.Data = folder;
             return response;
         }
         else
@@ -54,7 +69,7 @@ public class FolderService : IFolderService
         if (pathList.Count == 0)
         {
             return new Folder{
-                Name = "root",
+                Name = "Root Folder",
                 SubFolders = rootFolders
             };
         }
@@ -100,7 +115,7 @@ public class FolderService : IFolderService
             response.Message = "Folder not found";
             return response;
         }
-        if (parentFolder.Name == "root")
+        if (parentFolder.Name == "Root Folder")
         {
             folder.ParentId = null;
         }
@@ -140,15 +155,12 @@ public class FolderService : IFolderService
         {
             return parentPath;
         }
-        var parentFolder = _context.Folders
-            .Include(f => f.SubFolders)
-            .FirstOrDefault(f => f.Id == folder.ParentId);
-        
-        DeleteFolder(folder.Id);
+
+        DeleteFolderById(folder.Id);
         return parentPath;
     }
 
-    public void DeleteFolder(Guid folderId)
+    public void DeleteFolderById(Guid folderId)
     {
         var folder = _context.Folders.Include(f => f.SubFolders).FirstOrDefault(f => f.Id == folderId);
 
@@ -164,7 +176,68 @@ public class FolderService : IFolderService
     {
         foreach (var subfolder in subfolders.ToList())
         {
-            DeleteFolder(subfolder.Id);
+            DeleteFolderById(subfolder.Id);
+        }
+    }
+
+    public string CreateFolderStructure(string rootFolderPath, Folder folder)
+    {
+        string folderPath = Path.Combine(rootFolderPath, folder.Name);
+
+        // Create the main folder
+        Directory.CreateDirectory(folderPath);
+
+        // Create subfolders recursively
+        if (folder.SubFolders != null)
+        {
+            foreach (Folder subFolder in folder.SubFolders)
+            {
+                var subFolderEntity = _context.Folders
+                    .Include(f => f.SubFolders)
+                    .First(f => f.Id == subFolder.Id);
+                CreateFolderStructure(folderPath, subFolderEntity);
+            }
+        }
+
+        return folderPath;
+    }
+
+    public byte[] ZipFolder(string folderPath)
+    {
+        if (Directory.Exists(folderPath))
+        {
+            using (MemoryStream zipMemoryStream = new MemoryStream())
+            {
+                using (ZipArchive zipArchive = new ZipArchive(zipMemoryStream, ZipArchiveMode.Create, true))
+                {
+                    AddFolderToZipArchive(zipArchive, folderPath, string.Empty);
+                }
+
+                return zipMemoryStream.ToArray();
+            }
+        }
+        else
+        {
+            throw new DirectoryNotFoundException("Folder not found");
+        }
+    }
+
+    private void AddFolderToZipArchive(ZipArchive zipArchive, string folderPath, string parentPath)
+    {
+        string entryPath = Path.Combine(parentPath, Path.GetFileName(folderPath));
+
+        ZipArchiveEntry folderEntry = zipArchive.CreateEntry(entryPath + "/");
+
+        foreach (string filePath in Directory.GetFiles(folderPath))
+        {
+            string fileEntryPath = Path.Combine(entryPath, Path.GetFileName(filePath));
+
+            ZipArchiveEntry fileEntry = zipArchive.CreateEntryFromFile(filePath, fileEntryPath);
+        }
+
+        foreach (string subFolderPath in Directory.GetDirectories(folderPath))
+        {
+            AddFolderToZipArchive(zipArchive, subFolderPath, entryPath);
         }
     }
 }

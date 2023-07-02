@@ -33,25 +33,29 @@
     @if (Model.Data is not null)
     {
         <h3 class="display-4">@Model.Data.Name</h3>
-        <p>Sub folders</p>
-        <ul>
-            @if (Model.Data.SubFolders.Count() > 0)
-            {
+        
+        @if (Model.Data.SubFolders.Count() > 0)
+        {
+            <p>Sub folders</p>
+            <ul>
                 @foreach (var subFolder in Model.Data.SubFolders)
                 {
                     string path = "";
                     if (Model.Path is not null)
-                        path = Model.Path + "/" + subFolder.Name;
+                    path = Model.Path + "/" + subFolder.Name;
                     else
-                        path = subFolder.Name;
-                    <a href="/@path"><li>@subFolder.Name</li></a>
+                    path = subFolder.Name;
+                    <a href="/@path">
+                        <li>@subFolder.Name</li>
+                    </a>
                 }
-            }
-            else
-            {
-                <p>Folder is empty</p>
-            }
-        </ul>
+            </ul>
+        }
+        else
+        {
+            <p>Folder is empty</p>
+        }
+                
         <hr>   
         @using (Html.BeginForm("PostFolder", "Folder", FormMethod.Post, new {path = @Context.Request.Path}))
         {
@@ -75,6 +79,19 @@
                 <button type="submit">Delete</button>
             }
         }
+
+        <hr>
+        <!-- Download Folder -->
+        @if (@Model.Path is not null)
+        {
+            @using (Html.BeginForm("DownloadFolder", "Folder", FormMethod.Post, new {path = @Model.Path}))
+            {
+                <label>Download folder</label>
+                <input name="path" value="@Model.Path" type="hidden"/>
+                <button type="submit">Download</button>
+            }
+        }
+
     }
     else
     {
