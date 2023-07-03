@@ -3,36 +3,77 @@ using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using TestTaskFolderHierarchy.Data;
+using TestTaskFolderHierarchy.Models;
 
 namespace TestTaskFolderHierarchy.Services.FileService;
 
 public class FileService : IFileService
 {
-    public void ExtractFolder(Stream inputStream, string destinationFolderPath)
-    {
-        destinationFolderPath = Path.Combine(destinationFolderPath, Guid.NewGuid().ToString());
-        Directory.CreateDirectory(destinationFolderPath);
+    private readonly DataContext _context;
 
-        using (var zipArchive = new ZipArchive(inputStream, ZipArchiveMode.Read))
+    public FileService(DataContext context)
+    {
+        _context = context;
+    }
+
+    public string CreateFolderStructure(string rootFolderPath, Folder folder)
+    {
+        string folderPath = Path.Combine(rootFolderPath, folder.Name);
+
+        Directory.CreateDirectory(folderPath);
+
+        if (folder.SubFolders != null)
         {
-            // Extract each entry in the zip archive
-            foreach (var entry in zipArchive.Entries)
+            foreach (Folder subFolder in folder.SubFolders)
             {
-                // Skip directories (if any)
-                if (string.IsNullOrEmpty(entry.Name))
+                var subFolderEntity = _context.Folders
+                    .Include(f => f.SubFolders)
+                    .First(f => f.Id == subFolder.Id);
+                CreateFolderStructure(folderPath, subFolderEntity);
+            }
+        }
+
+        return folderPath;
+    }
+
+    public byte[] ZipFolder(string folderPath)
+    {
+        if (Directory.Exists(folderPath))
+        {
+            using (MemoryStream zipMemoryStream = new MemoryStream())
+            {
+                using (ZipArchive zipArchive = new ZipArchive(zipMemoryStream, ZipArchiveMode.Create, true))
                 {
-                    continue;
+                    AddFolderToZipArchive(zipArchive, folderPath, string.Empty);
                 }
 
-                // Create the entry's full destination path
-                string entryDestinationPath = Path.Combine(destinationFolderPath, entry.FullName);
-
-                // Ensure the parent directory of the entry exists
-                Directory.CreateDirectory(Path.GetDirectoryName(entryDestinationPath)!);
-
-                // Extract the entry to the destination path
-                entry.ExtractToFile(entryDestinationPath, overwrite: true);
+                return zipMemoryStream.ToArray();
             }
+        }
+        else
+        {
+            throw new DirectoryNotFoundException("Folder not found");
+        }
+    }
+
+    private void AddFolderToZipArchive(ZipArchive zipArchive, string folderPath, string parentPath)
+    {
+        string entryPath = Path.Combine(parentPath, Path.GetFileName(folderPath));
+
+        ZipArchiveEntry folderEntry = zipArchive.CreateEntry(entryPath + "/");
+
+        foreach (string filePath in Directory.GetFiles(folderPath))
+        {
+            string fileEntryPath = Path.Combine(entryPath, Path.GetFileName(filePath));
+
+            ZipArchiveEntry fileEntry = zipArchive.CreateEntryFromFile(filePath, fileEntryPath);
+        }
+
+        foreach (string subFolderPath in Directory.GetDirectories(folderPath))
+        {
+            AddFolderToZipArchive(zipArchive, subFolderPath, entryPath);
         }
     }
 }

@@ -54,13 +54,13 @@ public class FolderController : Controller
             if (folder is not null)
             {
                 // Create the folder structure in the destination folder
-                _folderService.CreateFolderStructure(destinationFolderPath, folder);
+                _fileService.CreateFolderStructure(destinationFolderPath, folder);
 
                 // Get the name of the folder being downloaded
                 string folderName = folder.Name;
 
                 // Generate the zip file
-                byte[] zipFileBytes = _folderService.ZipFolder(Path.Combine(destinationFolderPath, folderName));
+                byte[] zipFileBytes = _fileService.ZipFolder(Path.Combine(destinationFolderPath, folderName));
 
                 // Delete the temporary folder structure
                 Directory.Delete(destinationFolderPath, true);
@@ -108,7 +108,7 @@ public class FolderController : Controller
                 _folderService.ParseFolder(destinationFolderPath, parent);
 
                 // Delete the temporary folder structure
-                Directory.Delete(destinationFolderPath, true);
+                Directory.Delete(Directory.GetParent(destinationFolderPath)!.ToString(), true);
 
                 // Get the root folder entity
                 return Redirect("/" + path);
