@@ -44,6 +44,7 @@ public class FolderService : IFolderService
         if (pathList.Count == 0)
         {
             return new Folder{
+                Id = Guid.Empty,
                 Name = "Root Folder",
                 SubFolders = rootFolders
             };
@@ -135,65 +136,6 @@ public class FolderService : IFolderService
         }
     }
 
-    public string CreateFolderStructure(string rootFolderPath, Folder folder)
-    {
-        string folderPath = Path.Combine(rootFolderPath, folder.Name);
-
-        Directory.CreateDirectory(folderPath);
-
-        if (folder.SubFolders != null)
-        {
-            foreach (Folder subFolder in folder.SubFolders)
-            {
-                var subFolderEntity = _context.Folders
-                    .Include(f => f.SubFolders)
-                    .First(f => f.Id == subFolder.Id);
-                CreateFolderStructure(folderPath, subFolderEntity);
-            }
-        }
-
-        return folderPath;
-    }
-
-    public byte[] ZipFolder(string folderPath)
-    {
-        if (Directory.Exists(folderPath))
-        {
-            using (MemoryStream zipMemoryStream = new MemoryStream())
-            {
-                using (ZipArchive zipArchive = new ZipArchive(zipMemoryStream, ZipArchiveMode.Create, true))
-                {
-                    AddFolderToZipArchive(zipArchive, folderPath, string.Empty);
-                }
-
-                return zipMemoryStream.ToArray();
-            }
-        }
-        else
-        {
-            throw new DirectoryNotFoundException("Folder not found");
-        }
-    }
-
-    private void AddFolderToZipArchive(ZipArchive zipArchive, string folderPath, string parentPath)
-    {
-        string entryPath = Path.Combine(parentPath, Path.GetFileName(folderPath));
-
-        ZipArchiveEntry folderEntry = zipArchive.CreateEntry(entryPath + "/");
-
-        foreach (string filePath in Directory.GetFiles(folderPath))
-        {
-            string fileEntryPath = Path.Combine(entryPath, Path.GetFileName(filePath));
-
-            ZipArchiveEntry fileEntry = zipArchive.CreateEntryFromFile(filePath, fileEntryPath);
-        }
-
-        foreach (string subFolderPath in Directory.GetDirectories(folderPath))
-        {
-            AddFolderToZipArchive(zipArchive, subFolderPath, entryPath);
-        }
-    }
-
     public void ParseFolder(string folderPath, Folder? parentFolder)
     {
         string[] subdirectories = Directory.GetDirectories(folderPath);
@@ -203,13 +145,16 @@ public class FolderService : IFolderService
             Folder folder = new Folder
             {
                 Name = Path.GetFileName(subdirectory),
-                ParentId = parentFolder is null ? null : parentFolder.Id
+                ParentId = Guid.Equals(parentFolder?.Id, Guid.Empty) ? null : parentFolder?.Id
             };
 
-            _context.Folders.Add(folder);
+            if (parentFolder is not null)
+                parentFolder.SubFolders.Add(folder);
 
-            ParseFolder(subdirectory, folder);
+            _context.Folders.Add(folder);
+            _context.SaveChanges();
+            ParseFolder(subdirectory, _context.Folders.Include(f => f.SubFolders).First(f => f.Id == folder.Id));
         }
-        _context.SaveChangesAsync();
+        
     }
 }

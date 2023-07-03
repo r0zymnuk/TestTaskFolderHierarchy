@@ -67,10 +67,10 @@
             <button type="submit">Submit</button>
         }
 
-        <hr>
-        <!-- Delete Folder -->
         @if (@Model.Path is not null)
         {
+            <hr>
+            <!-- Delete Folder -->
             @using (Html.BeginForm("DeleteFolder", "Folder", FormMethod.Post, new {path = @Context.Request.Path}))
             {
                 <h5>Delete folder</h5>
@@ -81,30 +81,24 @@
 
         <hr>
         <!-- Download Folder -->
-        @if (@Model.Path is not null)
+        @using (Html.BeginForm("DownloadFolder", "Folder", FormMethod.Post, new {path = @Model.Path}))
         {
-            @using (Html.BeginForm("DownloadFolder", "Folder", FormMethod.Post, new {path = @Model.Path}))
-            {
-                <h5>Download folder</h5>
-                <input name="path" value="@Model.Path" type="hidden"/>
-                <button type="submit">Download</button>
-            }
+            <h5>Download folder</h5>
+            <input name="path" value="@Model.Path" type="hidden" />
+            <button type="submit">Download</button>
         }
 
         <hr>
         <!-- Upload Folder -->
-        @if (@Model.Path is not null)
+        @using (Html.BeginForm("UploadFolder", "Folder", FormMethod.Post, new {path = @Model.Path, enctype = "multipart/form-data"}))
         {
-            @using (Html.BeginForm("UploadFolder", "Folder", FormMethod.Post, new {path = @Model.Path, enctype = "multipart/form-data"}))
-            {
-
-                <h5>Upload folder</h5>
-                <p>Choose zip archives</p>
-                <input name="path" value="@Model.Path" type="hidden"/>
-                <input type="file" name="file" multiple />
-                <button type="submit">Download</button>
-            }
+            <h5>Upload folder</h5>
+            <p>Choose zip archives</p>
+            <input name="path" value="@Model.Path" type="hidden" />
+            <input type="file" name="file" multiple />
+            <button type="submit">Download</button>
         }
+        
     }
     else
     {
