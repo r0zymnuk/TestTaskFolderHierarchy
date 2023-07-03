@@ -1,20 +1,24 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using TestTaskFolderHierarchy.Models;
+using TestTaskFolderHierarchy.Services.FileService;
 using TestTaskFolderHierarchy.Services.FolderService;
+using System.IO.Compression;
 
 namespace TestTaskFolderHierarchy.Controllers;
 
 public class FolderController : Controller
 {
-    private readonly string ProjectFolderPath = System.AppDomain.CurrentDomain.BaseDirectory;
+    private string ProjectFolderPath = System.AppDomain.CurrentDomain.BaseDirectory;
     private readonly ILogger<FolderController> _logger;
     private readonly IFolderService _folderService;
+    private readonly IFileService _fileService;
 
-    public FolderController(ILogger<FolderController> logger, IFolderService folderService)
+    public FolderController(ILogger<FolderController> logger, IFolderService folderService, IFileService fileService)
     {
         _logger = logger;
         _folderService = folderService;
+        _fileService = fileService;
     }
 
     [HttpGet("{*path}")]
@@ -45,15 +49,15 @@ public class FolderController : Controller
         try
         {
             // Get the folder entity with its subfolders by the folder path
-            var folderResponse = _folderService.GetFolderModelByPath(path);
+            var folder = _folderService.GetToTheLastFolder(path);
 
-            if (folderResponse.Success)
+            if (folder is not null)
             {
                 // Create the folder structure in the destination folder
-                _folderService.CreateFolderStructure(destinationFolderPath, folderResponse.Data!);
+                _folderService.CreateFolderStructure(destinationFolderPath, folder);
 
                 // Get the name of the folder being downloaded
-                string folderName = folderResponse.Data!.Name;
+                string folderName = folder.Name;
 
                 // Generate the zip file
                 byte[] zipFileBytes = _folderService.ZipFolder(Path.Combine(destinationFolderPath, folderName));
@@ -68,7 +72,7 @@ public class FolderController : Controller
             else
             {
                 // Handle the case when the folder retrieval failed
-                return Content("Error: " + folderResponse.Message);
+                return Content($"Error: Cannot find the folder at path {path}");
             }
         }
         catch (Exception ex)
@@ -77,6 +81,46 @@ public class FolderController : Controller
             // You can customize the error handling based on your requirements
             return Content("An error occurred: " + ex.Message);
         }
+    }
+
+    [HttpPost]
+    public ActionResult UploadFolder(IFormFile file, string path)
+    {
+        if (file != null && file.Length > 0)
+        {
+            try
+            {
+                // Create the destination folder path
+                string destinationFolderPath = Path.Combine(ProjectFolderPath, "TemporaryFolder", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(destinationFolderPath);
+                var pathToZip = Path.Combine(destinationFolderPath, file.FileName);
+
+                // Extract the uploaded folder to the destination folder
+                using (var fileStream = new FileStream(pathToZip, FileMode.Create) )
+                {
+                    file.CopyTo(fileStream);
+                }
+                ZipFile.ExtractToDirectory(pathToZip, destinationFolderPath);
+
+                var parent = _folderService.GetToTheLastFolder(path);
+
+                // Parse the folder structure into folder entities
+                _folderService.ParseFolder(destinationFolderPath, parent);
+
+                // Delete the temporary folder structure
+                Directory.Delete(destinationFolderPath, true);
+
+                // Get the root folder entity
+                return Redirect("/" + path);
+            }
+            catch (Exception ex)
+            {
+                return Content("An error occurred: " + ex.Message);
+            }
+        }
+
+        // If no file was uploaded, return an error response or redirect to an error page
+        return Content("No file uploaded!");
     }
     
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
