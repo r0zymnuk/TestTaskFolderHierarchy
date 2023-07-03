@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TestTaskFolderHierarchy.Data;
+using TestTaskFolderHierarchy.Services.FileService;
 using TestTaskFolderHierarchy.Services.FolderService;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,7 @@ builder.Services.AddDbContext<DataContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IFolderService, FolderService>();
+builder.Services.AddScoped<IFileService, FileService>();
 
 builder.Services.AddAutoMapper(typeof(Program).Assembly);
 

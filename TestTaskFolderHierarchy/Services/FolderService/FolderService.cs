@@ -22,32 +22,16 @@ public class FolderService : IFolderService
     {
         var response = new ServiceResponse<FolderViewModel>();
         response.Path = path;
-        var folderResponse = GetFolderModelByPath(path);
+        Folder? folder = GetToTheLastFolder(path);
 
-        response.Data = _mapper.Map<FolderViewModel>(folderResponse.Data);
-        response.Success = folderResponse.Success;
-        response.Message = folderResponse.Message;
-
-        return response;
-    }
-
-    public ServiceResponse<Folder> GetFolderModelByPath(string path)
-    {
-        var response = new ServiceResponse<Folder>();
-        response.Path = path;
-
-        var folder = GetToTheLastFolder(path);
-        response.Data = folder;
-        if (folder is null)
-        {
-            response.Success = false;
-            response.Message = "Folder not found";
-        }
+        response.Data = _mapper.Map<FolderViewModel>(folder);
+        response.Success = folder is null ? false : true;
+        response.Message = folder is null ? "Folder not found" : $"Folder {folder.Name} found";
 
         return response;
     }
 
-    private Folder? GetToTheLastFolder(string path)
+    public Folder? GetToTheLastFolder(string path)
     {
         var pathList = new List<string>();
         if (!string.IsNullOrEmpty(path))
@@ -66,42 +50,34 @@ public class FolderService : IFolderService
         }
         while (pathList.Count > 0)
         {
-            var folderName = pathList[0];
+            string folderName = pathList[0];
             pathList.RemoveAt(0);
-            var folder = rootFolders.FirstOrDefault(f => f.Name == folderName);
+            Folder? folder = rootFolders.FirstOrDefault(f => f.Name == folderName);
             if (folder is null)
-            {
                 return null;
-            }
+            
             if (pathList.Count == 0)
-            {
                 return _context.Folders
                     .Include(f => f.SubFolders)
                     .FirstOrDefault(f => f.Id == folder.Id);
-            }
+            
             rootFolders = _context.Folders
                 .Include(f => f.SubFolders)
                 .Where(f => f.ParentId == folder.Id)
                 .ToList();
         }
         return null;
-
     }
 
     public string CreateFolder(string name, string path)
     {
-        var response = new ServiceResponse<FolderViewModel>();
-        response.Path = path;
-        
-        var folder = new Folder();
+        Folder folder = new Folder();
         folder.Name = name;
 
         var parentFolder = GetToTheLastFolder(path);
 
         if (parentFolder is null)
-        {
             return path;
-        }
 
         if (parentFolder.Name == "Root Folder")
         {
@@ -126,43 +102,36 @@ public class FolderService : IFolderService
 
 
     public string DeleteFolder(string path)
-    {
-        var pathList = new List<string>();
-        
-        //Get path to parent folder
-        var parentPath = Path.GetDirectoryName(path) ?? string.Empty;
+    {        
+        string parentPath = Path.GetDirectoryName(path) ?? string.Empty;
 
-        var folder = GetToTheLastFolder(path);
+        Folder? folder = GetToTheLastFolder(path);
         if (folder is null)
         {
             return parentPath;
         }
 
-        DeleteSubfolders(folder.SubFolders);
+        DeleteSubfolders(folder.SubFolders.ToList());
         _context.Folders.Remove(folder);
         _context.SaveChanges();
 
         return parentPath;
     }
 
-    private void DeleteSubfolders(ICollection<Folder> subfolders)
+    private void DeleteSubfolders(List<Folder> subfolders)
     {
-        foreach (var subfolder in subfolders.ToList())
-        {
-            using (var transactionScope = new TransactionScope())
-            {
-                var subfolderEntity = _context.Folders
-                    .Include(f => f.SubFolders)
-                    .First(f => f.Id == subfolder.Id);
-
-                if (subfolder.SubFolders.Count > 0)
-                    DeleteSubfolders(subfolder.SubFolders);
+        Folder folder = new Folder();
+        foreach (Folder subfolder in subfolders)
+        {   
+            folder = _context.Folders
+                .Include(f => f.SubFolders)
+                .First(f => f.Id == subfolder.Id);
+            if (folder.SubFolders.Count > 0)
+                DeleteSubfolders(folder.SubFolders.ToList());
                 
-                _context.Folders.Remove(subfolderEntity);
-                _context.SaveChanges();
+            _context.Folders.Remove(folder);
+            _context.SaveChanges();
 
-                transactionScope.Complete();
-            }
         }
     }
 
@@ -170,10 +139,8 @@ public class FolderService : IFolderService
     {
         string folderPath = Path.Combine(rootFolderPath, folder.Name);
 
-        // Create the main folder
         Directory.CreateDirectory(folderPath);
 
-        // Create subfolders recursively
         if (folder.SubFolders != null)
         {
             foreach (Folder subFolder in folder.SubFolders)
@@ -225,5 +192,24 @@ public class FolderService : IFolderService
         {
             AddFolderToZipArchive(zipArchive, subFolderPath, entryPath);
         }
+    }
+
+    public void ParseFolder(string folderPath, Folder? parentFolder)
+    {
+        string[] subdirectories = Directory.GetDirectories(folderPath);
+
+        foreach (string subdirectory in subdirectories)
+        {
+            Folder folder = new Folder
+            {
+                Name = Path.GetFileName(subdirectory),
+                ParentId = parentFolder is null ? null : parentFolder.Id
+            };
+
+            _context.Folders.Add(folder);
+
+            ParseFolder(subdirectory, folder);
+        }
+        _context.SaveChangesAsync();
     }
 }

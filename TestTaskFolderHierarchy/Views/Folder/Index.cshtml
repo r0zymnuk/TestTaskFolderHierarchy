@@ -59,8 +59,7 @@
         <hr>   
         @using (Html.BeginForm("PostFolder", "Folder", FormMethod.Post, new {path = @Context.Request.Path}))
         {
-            <label>Create new folder</label>
-            <br>
+            <h5>Create new folder</h5>
             <input name="path" value="@Model.Path" type="hidden"/>
             <label for="name">Name:</label>
             <input type="text" id="name" name="Name" value="New Folder" />
@@ -74,7 +73,7 @@
         {
             @using (Html.BeginForm("DeleteFolder", "Folder", FormMethod.Post, new {path = @Context.Request.Path}))
             {
-                <label>Delete folder</label>
+                <h5>Delete folder</h5>
                 <input name="path" value="@Model.Path" type="hidden"/>
                 <button type="submit">Delete</button>
             }
@@ -86,12 +85,26 @@
         {
             @using (Html.BeginForm("DownloadFolder", "Folder", FormMethod.Post, new {path = @Model.Path}))
             {
-                <label>Download folder</label>
+                <h5>Download folder</h5>
                 <input name="path" value="@Model.Path" type="hidden"/>
                 <button type="submit">Download</button>
             }
         }
 
+        <hr>
+        <!-- Upload Folder -->
+        @if (@Model.Path is not null)
+        {
+            @using (Html.BeginForm("UploadFolder", "Folder", FormMethod.Post, new {path = @Model.Path, enctype = "multipart/form-data"}))
+            {
+
+                <h5>Upload folder</h5>
+                <p>Choose zip archives</p>
+                <input name="path" value="@Model.Path" type="hidden"/>
+                <input type="file" name="file" multiple />
+                <button type="submit">Download</button>
+            }
+        }
     }
     else
     {
